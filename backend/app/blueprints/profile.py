@@ -8,12 +8,12 @@ from flask import Blueprint, request, g
 from ..decorators import login_required, log_request
 from ..extensions import db
 from ..utils.response import ApiResponse
-from ..utils.validators import validate_required
+from ..utils.validators import validate_required, validate_length
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api/profile")
 
 
-@profile_bp.route("/", methods=["POST"])
+@profile_bp.route("/", methods=["PUT"])
 @login_required
 @log_request
 def update_profile():
@@ -23,10 +23,22 @@ def update_profile():
     if error:
         return ApiResponse.error(error)
 
+    error = validate_length(data["major"], "专业", min_len=1, max_len=100)
+    if error:
+        return ApiResponse.error(error)
+    error = validate_length(data["grade"], "年级", min_len=1, max_len=50)
+    if error:
+        return ApiResponse.error(error)
+    interests = data.get("interests", "")
+    if interests:
+        error = validate_length(interests, "兴趣", max_len=500)
+        if error:
+            return ApiResponse.error(error)
+
     user = g.current_user
-    user.major = data["major"]
-    user.grade = data["grade"]
-    user.interests = data.get("interests", "")
+    user.major = data["major"].strip()
+    user.grade = data["grade"].strip()
+    user.interests = interests.strip()
     db.session.commit()
 
     return ApiResponse.success(user.to_dict())

@@ -17,7 +17,7 @@ class Config:
     """基础配置（单例基类）"""
 
     # Flask
-    SECRET_KEY = os.getenv("JWT_SECRET", "dev-secret-key")
+    SECRET_KEY = os.getenv("JWT_SECRET", "")
     DEBUG = False
     TESTING = False
 
@@ -29,7 +29,7 @@ class Config:
     DB_NAME = os.getenv("DB_NAME", "course_selection")
 
     # JWT
-    JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-key")
+    JWT_SECRET = os.getenv("JWT_SECRET", "")
     JWT_ALGORITHM = "HS256"
     JWT_EXPIRATION_HOURS = 8
 
@@ -39,7 +39,7 @@ class Config:
     MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-1")
 
     # CORS
-    CORS_ORIGINS = ["http://localhost:5173"]
+    CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
@@ -66,15 +66,21 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-key-only-for-local")
 
 
 class TestingConfig(Config):
     TESTING = True
     DB_NAME = "course_selection_test"
+    JWT_SECRET = os.getenv("JWT_SECRET", "test-secret-key")
 
 
 class ProductionConfig(Config):
-    pass
+    def __init__(self):
+        if not self.JWT_SECRET or len(self.JWT_SECRET) < 32:
+            raise RuntimeError(
+                "生产环境必须设置 JWT_SECRET 环境变量，且长度不少于 32 个字符。"
+            )
 
 
 # 配置映射 — 全局唯一入口

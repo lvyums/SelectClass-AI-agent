@@ -13,7 +13,16 @@ from ..utils.validators import validate_required
 chat_bp = Blueprint("chat", __name__, url_prefix="/api/chat")
 
 MAX_HISTORY = 20
+MAX_CACHED_USERS = 500
 _histories: dict[int, list[dict[str, str]]] = {}
+
+
+def _evict_old_histories():
+    """当缓存用户数超过上限时，清理最早的条目"""
+    if len(_histories) > MAX_CACHED_USERS:
+        keys = list(_histories.keys())
+        for k in keys[: len(keys) // 4]:
+            _histories.pop(k, None)
 
 
 @chat_bp.route("/", methods=["POST"])
@@ -29,6 +38,7 @@ def chat():
     message = data["message"][:1000]
     user = g.current_user
 
+    _evict_old_histories()
     history = _histories.get(user.id, [])
     history.append({"role": "user", "content": message})
 

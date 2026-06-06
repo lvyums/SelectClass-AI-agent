@@ -22,7 +22,7 @@ def recommend():
 
     recs = recommend_courses(g.current_user, query)
     explanation = (
-        f"已根据你的专业和年级推荐课程，并结合关键词"{query}"。"
+        f"已根据你的专业和年级推荐课程，并结合关键词'{query}'。"
         if query else "已根据你的专业和年级推荐这些课程。"
     )
     return ApiResponse.success({

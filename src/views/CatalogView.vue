@@ -66,8 +66,14 @@ async function handleAddCourse(course) {
 function handleDrop(event) {
   const payload = event.dataTransfer.getData('application/course')
   if (!payload) return
-  const course = JSON.parse(payload)
-  handleAddCourse(course)
+  try {
+    const course = JSON.parse(payload)
+    if (course && course.id) {
+      handleAddCourse(course)
+    }
+  } catch {
+    // ignore invalid drag data
+  }
 }
 </script>
 

@@ -24,16 +24,30 @@ class RateLimiter:
         self.window_seconds = window_seconds
         self._requests: dict[str, list[float]] = defaultdict(list)
         self._lock = Lock()
+        self._cleanup_counter = 0
 
     def is_allowed(self, key: str) -> bool:
         now = time.time()
         with self._lock:
+            self._cleanup_counter += 1
+            if self._cleanup_counter >= 100:
+                self._cleanup_stale(now)
+                self._cleanup_counter = 0
             timestamps = self._requests[key]
             self._requests[key] = [t for t in timestamps if now - t < self.window_seconds]
             if len(self._requests[key]) >= self.max_requests:
                 return False
             self._requests[key].append(now)
             return True
+
+    def _cleanup_stale(self, now: float) -> None:
+        """清理窗口期外的过期条目，防止内存泄漏"""
+        stale_keys = [
+            k for k, v in self._requests.items()
+            if all(now - t >= self.window_seconds for t in v)
+        ]
+        for k in stale_keys:
+            del self._requests[k]
 
 _login_limiter = RateLimiter(max_requests=10, window_seconds=60)
 _register_limiter = RateLimiter(max_requests=5, window_seconds=60)

@@ -23,7 +23,7 @@
           </div>
           <div>
             <dt>时间</dt>
-            <dd>{{ course.schedule_display || course.schedule }}</dd>
+            <dd>{{ course.schedule_display }}</dd>
           </div>
           <div>
             <dt>课程目标</dt>

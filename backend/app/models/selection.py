@@ -1,6 +1,6 @@
 """选课记录模型"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from ..extensions import db
 
 
@@ -10,7 +10,7 @@ class Selection(db.Model):
     id = db.Column(db.Integer, primary_key=True, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     course_id = db.Column(db.Integer, db.ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = db.relationship("User", back_populates="selections")
     course = db.relationship("Course", back_populates="selections")

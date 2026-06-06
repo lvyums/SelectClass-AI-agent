@@ -105,9 +105,7 @@ export const useSelectionStore = defineStore('selection', () => {
       window.alert('存在课程冲突，请先处理冲突后再确认。')
       return
     }
-    const data = await enrollApi(selectedCourses.value.map((c) => c.id))
-    selectedCourses.value = data.data || data
-    window.alert('选课已提交，课程已保存到你的账户。')
+    window.alert('选课已确认，课程已保存到你的账户。')
   }
 
   async function sendMessage(message) {

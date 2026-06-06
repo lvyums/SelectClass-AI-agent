@@ -132,6 +132,12 @@ def enroll_courses(user, course_ids: list[int]) -> dict:
     existing_courses = get_user_selections(user.id)
     requested_courses = db.session.query(Course).filter(Course.id.in_(course_ids)).all()
 
+    # 检查是否有不存在的课程 ID
+    found_ids = {c.id for c in requested_courses}
+    missing_ids = [cid for cid in course_ids if cid not in found_ids]
+    if missing_ids:
+        return {"success": False, "error": f"以下课程 ID 不存在：{missing_ids}"}
+
     for course in requested_courses:
         strategy = _get_strategy(course.course_type)
         error = strategy.validate(user, course, existing_courses)

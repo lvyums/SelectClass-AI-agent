@@ -1,6 +1,6 @@
 """用户模型"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from ..extensions import db
 
 
@@ -13,7 +13,7 @@ class User(db.Model):
     major = db.Column(db.String(100), default="")
     grade = db.Column(db.String(50), default="")
     interests = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     selections = db.relationship("Selection", back_populates="user", cascade="all, delete-orphan")
     history = db.relationship("UserHistory", back_populates="user", cascade="all, delete-orphan")

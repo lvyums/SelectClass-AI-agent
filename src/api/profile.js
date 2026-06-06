@@ -5,5 +5,5 @@
 import request from './request'
 
 export function updateProfileApi(data) {
-  return request.post('/api/profile/', data)
+  return request.put('/api/profile/', data)
 }

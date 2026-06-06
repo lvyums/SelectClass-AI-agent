@@ -2,10 +2,9 @@
 认证服务 — 封装密码哈希、JWT 生成、用户验证逻辑
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from ..config import config
 from ..extensions import db
 from ..models.user import User
 
@@ -24,17 +23,17 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_token(username: str) -> str:
     """生成 JWT Token"""
-    cfg = config["default"]
-    expire = datetime.utcnow() + timedelta(hours=cfg.JWT_EXPIRATION_HOURS)
+    from flask import current_app
+    expire = datetime.now(timezone.utc) + timedelta(hours=current_app.config.get("JWT_EXPIRATION_HOURS", 8))
     payload = {"sub": username, "exp": expire}
-    return jwt.encode(payload, cfg.JWT_SECRET, algorithm=cfg.JWT_ALGORITHM)
+    return jwt.encode(payload, current_app.config["JWT_SECRET"], algorithm=current_app.config.get("JWT_ALGORITHM", "HS256"))
 
 
 def decode_token(token: str) -> str | None:
     """解码 JWT Token，返回 username 或 None"""
-    cfg = config["default"]
+    from flask import current_app
     try:
-        payload = jwt.decode(token, cfg.JWT_SECRET, algorithms=[cfg.JWT_ALGORITHM])
+        payload = jwt.decode(token, current_app.config["JWT_SECRET"], algorithms=[current_app.config.get("JWT_ALGORITHM", "HS256")])
         return payload.get("sub")
     except JWTError:
         return None

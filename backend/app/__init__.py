@@ -38,7 +38,7 @@ def create_app(config_name: str = "default") -> Flask:
 
     # 2. 初始化扩展（Singleton Pattern — db 全局唯一）
     db.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", ["*"])}})
+    cors.init_app(app, resources={r"/api/*": {"origins": app.config.get("CORS_ORIGINS", [])}})
 
     # 3. 注册蓝图（Blueprint Pattern — 路由模块化）
     _register_blueprints(app)

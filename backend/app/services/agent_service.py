@@ -230,9 +230,13 @@ def _exec_replace_course(user_id: int, old_id: int, new_id: int, current_courses
     if conflict:
         return {"success": False, "error": f"{new_course.code} 与已选的 {conflict.code} 时间冲突，无法替换"}
 
-    db.session.delete(sel)
-    db.session.add(Selection(user_id=user_id, course_id=new_id))
-    db.session.commit()
+    try:
+        db.session.delete(sel)
+        db.session.add(Selection(user_id=user_id, course_id=new_id))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
     return {
         "success": True,
         "removed": {"code": old_course.code, "title": old_course.title},
@@ -270,6 +274,15 @@ TOOL_MAP = {
 
 def _get_user(user_id: int) -> User:
     return db.session.query(User).filter(User.id == user_id).first()
+
+
+def _sanitize_for_prompt(value: str, max_len: int = 100) -> str:
+    """清理用户输入，防止 prompt 注入"""
+    if not value:
+        return ""
+    cleaned = value.replace("{", "").replace("}", "").replace("\\", "")
+    cleaned = cleaned.replace("\n", " ").replace("\r", "")
+    return cleaned[:max_len].strip()
 
 # ---------------------------------------------------------------------------
 # Keyword fallback
@@ -414,14 +427,26 @@ def _keyword_fallback(user: User, message: str, current_courses: list) -> dict:
 # Main Agent
 # ---------------------------------------------------------------------------
 
+MAX_CACHED_USERS = 500
+
+
 class CourseAgent:
     """智能选课助手 — 封装 LLM 对话和工具调用逻辑"""
 
     def __init__(self):
         self._last_search: dict[int, list[dict]] = {}
 
+    def _evict_cache(self):
+        """当缓存用户数超过上限时，清理最早的条目"""
+        if len(self._last_search) > MAX_CACHED_USERS:
+            keys = list(self._last_search.keys())
+            for k in keys[: len(keys) // 4]:
+                self._last_search.pop(k, None)
+
     def handle_message(self, user: User, message: str, history: list[dict]) -> dict:
         """处理用户消息，返回 {answer, selected_courses?, recommendations?}"""
+        self._evict_cache()
+        message = _sanitize_for_prompt(message, 1000)
         current_courses = (
             db.session.query(Course)
             .join(Selection, Selection.course_id == Course.id)
@@ -516,6 +541,7 @@ class CourseAgent:
                 tool_result = tool_fn(user.id, tool_args, current_courses)
             except Exception as e:
                 logger.error("Tool %s failed: %s", tool_name, e)
+                db.session.rollback()
                 return _keyword_fallback(user, message, current_courses)
 
             if tool_name == "search_courses" and tool_result.get("courses"):
@@ -584,8 +610,10 @@ class CourseAgent:
         else:
             sel_text = "（暂无选课）"
         return AGENT_SYSTEM_PROMPT.format(
-            username=user.username, major=user.major or "未设置",
-            grade=user.grade or "未设置", interests=user.interests or "未设置",
+            username=_sanitize_for_prompt(user.username, 50),
+            major=_sanitize_for_prompt(user.major, 50) or "未设置",
+            grade=_sanitize_for_prompt(user.grade, 20) or "未设置",
+            interests=_sanitize_for_prompt(user.interests, 100) or "未设置",
             current_selections=sel_text,
         )
 

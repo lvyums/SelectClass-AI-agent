@@ -1,6 +1,6 @@
 """课程模型"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from ..extensions import db
 
 
@@ -21,7 +21,7 @@ class Course(db.Model):
     schedule_display = db.Column(db.String(255))
     schedule_json = db.Column(db.JSON)
     keywords = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
     selections = db.relationship("Selection", back_populates="course")
 

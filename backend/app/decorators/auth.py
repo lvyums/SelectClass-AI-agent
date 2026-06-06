@@ -8,7 +8,6 @@
 from functools import wraps
 from flask import request, g
 from jose import JWTError, jwt
-from ..config import config
 from ..extensions import db
 from ..models.user import User
 from ..utils.response import ApiResponse
@@ -31,8 +30,12 @@ def login_required(f):
             return ApiResponse.unauthorized("缺少认证令牌")
 
         try:
-            cfg = config["default"]
-            payload = jwt.decode(token, cfg.JWT_SECRET, algorithms=[cfg.JWT_ALGORITHM])
+            from flask import current_app
+            payload = jwt.decode(
+                token,
+                current_app.config["JWT_SECRET"],
+                algorithms=[current_app.config.get("JWT_ALGORITHM", "HS256")],
+            )
             username = payload.get("sub")
             if username is None:
                 return ApiResponse.unauthorized("无效的认证令牌")

@@ -14,7 +14,7 @@
     <div class="course-footer">
       <div>
         <p>{{ course.instructor }}</p>
-        <p>{{ course.schedule_display || course.schedule }}</p>
+        <p>{{ course.schedule_display }}</p>
       </div>
       <button v-if="!isSelected" type="button" @click.stop="addCourse">加入</button>
       <span v-else class="selected-badge">已选</span>

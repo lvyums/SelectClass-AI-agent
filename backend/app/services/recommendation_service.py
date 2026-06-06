@@ -16,20 +16,32 @@ logger = logging.getLogger(__name__)
 def _course_score(course: Course, query_text: str, user_major: str, user_grade: str, user_interests: str) -> int:
     """计算课程推荐分数"""
     score = 0
-    text = " ".join([
+    course_text = " ".join([
         course.title, course.code, course.summary or "",
         course.faculty, course.course_type, course.instructor,
-        course.keywords or "", user_major, user_grade, user_interests, query_text,
+        course.keywords or "",
     ]).lower()
 
-    if query_text and query_text.lower() in text:
+    # 查询匹配
+    if query_text and query_text in course_text:
         score += 30
-    if user_major and user_major.lower() in text:
+
+    # 专业匹配（课程院系或关键词包含用户专业）
+    if user_major and user_major in course_text:
         score += 20
-    if user_grade and user_grade.lower() in text:
-        score += 10
+
+    # 年级匹配（课程级别与年级对应）
+    if user_grade:
+        grade_level_map = {"大一": "beginner", "大二": "beginner", "大三": "intermediate", "大四": "advanced"}
+        expected_level = grade_level_map.get(user_grade, "")
+        if expected_level and expected_level in (course.level or "").lower():
+            score += 10
+
+    # 兴趣匹配（用户兴趣关键词出现在课程文本中）
     if user_interests:
-        score += sum(5 for keyword in user_interests.lower().split() if keyword in text)
+        score += sum(5 for keyword in user_interests.lower().split() if keyword in course_text)
+
+    # 学分和难度调整
     score += course.credits
     score += max(0, 5 - course.difficulty)
     return score
@@ -59,19 +71,28 @@ def recommend_courses(user, query: str = "", limit: int = 8) -> list[Course]:
                 payload={"query": query, "result": answer},
             ))
             db.session.commit()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("推荐 LLM 解释生成失败: %s", e)
 
     return recommendations
+
+
+def _sanitize_for_prompt(value: str, max_len: int = 100) -> str:
+    """清理用户输入，防止 prompt 注入"""
+    if not value:
+        return ""
+    cleaned = value.replace("{", "").replace("}", "").replace("\\", "")
+    cleaned = cleaned.replace("\n", " ").replace("\r", "")
+    return cleaned[:max_len].strip()
 
 
 def _build_recommendation_prompt(recommendations: list, user, query: str) -> str:
     """构建推荐解释的 LLM 提示词"""
     lines = [
-        f"学生专业: {user.major}",
-        f"学生年级: {user.grade}",
-        f"学生兴趣: {user.interests}",
-        f"查询: {query}",
+        f"学生专业: {_sanitize_for_prompt(user.major, 50)}",
+        f"学生年级: {_sanitize_for_prompt(user.grade, 20)}",
+        f"学生兴趣: {_sanitize_for_prompt(user.interests, 100)}",
+        f"查询: {_sanitize_for_prompt(query, 200)}",
         "以下为备选课程，请按照匹配度排序并返回简短说明：",
     ]
     for course in recommendations:
