@@ -1,0 +1,79 @@
+"""
+推荐服务 — 基于评分算法的课程推荐
+
+评分维度：查询匹配、专业匹配、年级匹配、兴趣匹配、学分、难度。
+可选调用 MiMo LLM 生成推荐解释。
+"""
+
+import logging
+from ..extensions import db
+from ..models.course import Course
+from ..models.history import UserHistory
+
+logger = logging.getLogger(__name__)
+
+
+def _course_score(course: Course, query_text: str, user_major: str, user_grade: str, user_interests: str) -> int:
+    """计算课程推荐分数"""
+    score = 0
+    text = " ".join([
+        course.title, course.code, course.summary or "",
+        course.faculty, course.course_type, course.instructor,
+        course.keywords or "", user_major, user_grade, user_interests, query_text,
+    ]).lower()
+
+    if query_text and query_text.lower() in text:
+        score += 30
+    if user_major and user_major.lower() in text:
+        score += 20
+    if user_grade and user_grade.lower() in text:
+        score += 10
+    if user_interests:
+        score += sum(5 for keyword in user_interests.lower().split() if keyword in text)
+    score += course.credits
+    score += max(0, 5 - course.difficulty)
+    return score
+
+
+def recommend_courses(user, query: str = "", limit: int = 8) -> list[Course]:
+    """获取推荐课程列表"""
+    query_text = query.strip().lower()
+    courses = db.session.query(Course).all()
+    scored = [
+        (course, _course_score(course, query_text, user.major or "", user.grade or "", user.interests or ""))
+        for course in courses
+    ]
+    scored.sort(key=lambda item: item[1], reverse=True)
+    recommendations = [course for course, _ in scored[:limit]]
+
+    # 可选：调用 LLM 生成推荐解释
+    from flask import current_app
+    if current_app.config.get("MIMO_API_KEY"):
+        try:
+            from .mimo_client import load_mimo
+            mimo = load_mimo()
+            prompt = _build_recommendation_prompt(recommendations, user, query)
+            answer = mimo([{"role": "user", "content": prompt}], max_tokens=512)
+            db.session.add(UserHistory(
+                user_id=user.id, event_type="recommendation_prompt",
+                payload={"query": query, "result": answer},
+            ))
+            db.session.commit()
+        except Exception:
+            pass
+
+    return recommendations
+
+
+def _build_recommendation_prompt(recommendations: list, user, query: str) -> str:
+    """构建推荐解释的 LLM 提示词"""
+    lines = [
+        f"学生专业: {user.major}",
+        f"学生年级: {user.grade}",
+        f"学生兴趣: {user.interests}",
+        f"查询: {query}",
+        "以下为备选课程，请按照匹配度排序并返回简短说明：",
+    ]
+    for course in recommendations:
+        lines.append(f"- {course.code} {course.title} ({course.faculty})：{course.summary}")
+    return "\n".join(lines)
