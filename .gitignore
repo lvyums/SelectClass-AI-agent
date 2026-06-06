@@ -25,3 +25,15 @@ course_selection
 
 # OS
 Thumbs.db
+
+# Lock files
+package-lock.json
+
+# Archives
+*.zip
+
+# Claude local settings
+.claude/settings.local.json
+
+# Internal docs
+docs/superpowers/
