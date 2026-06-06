@@ -37,3 +37,6 @@ package-lock.json
 
 # Internal docs
 docs/superpowers/
+
+# Duplicate code (use root backend/ and src/ instead)
+SelectClass/
